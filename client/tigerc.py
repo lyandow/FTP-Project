@@ -10,7 +10,7 @@ def connect_to_server(command_split):
         try:
             sock = socket.socket(
                 socket.AF_INET,
-                socket.SOCK_RAW,
+                socket.SOCK_STREAM,
                 socket.IPPROTO_TCP)
         except socket.error as err:
             print("There was an error creating a socket: " + err.strerror)
