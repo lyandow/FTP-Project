@@ -9,9 +9,15 @@ from os.path import exists
 lock = Lock()
 
 
+'''
+    This function is the first function called in each client's thread.
+    This function is responsible for establishing a connection with
+    the client and checking if the login credentials provided are valid.
+'''
 def on_new_client(clientSocket, clientAddr):
     string = "Client: " + str(clientAddr) + " has connected..."
     print(string)
+
     # Receive the username and password from this client
     data = clientSocket.recv(1024).decode()
     client_user_and_pass = data.split(" ")
@@ -38,11 +44,14 @@ def on_new_client(clientSocket, clientAddr):
             valid_user = True
         line_number += 1
     
+    # If the credentials provided are invalid, send ERROR message to the client,
+    # close the socket, and return to close the thread
     if not valid_user:
         error_message = "ERROR: The specified Username and Password are invalid. Closing connection..."
         clientSocket.send(error_message.encode())
         clientSocket.close()
         return
+    # Else credentials are valid, send SUCCESS message
     else:
         success_message = "SUCCESS: Login with specified Username and Password was successful."
         clientSocket.send(success_message.encode())
@@ -62,18 +71,19 @@ def on_new_client(clientSocket, clientAddr):
     print("Client %s has disconnected..." % str(clientAddr))
     return
 
+
 '''
     Since we don't want two separate clients writing the same
     file at the same time, we need this function synchronized
 '''
 def handle_put(clientSocket, received_message):
     global lock
-    
+    # Get lock for this function
     lock.acquire(1)
         
     ready_message = "READY FOR FILE"
 
-    # format: put <filename> <filesize>
+    # message format: put <filename> <filesize>
 
     need_confirmation = False
 
@@ -81,6 +91,7 @@ def handle_put(clientSocket, received_message):
     if exists(received_message[1]):
         need_confirmation = True
 
+        # Ask for overwrite confirmation if the file exists
         while need_confirmation:
             confirmation_msg = "CONFIRM: File already exists on the server. Do you want to overwrite the file? Y/N:"
             clientSocket.send(confirmation_msg.encode())
@@ -96,19 +107,30 @@ def handle_put(clientSocket, received_message):
                 lock.release()
                 return
 
+    # Client has either confirmed overwriting file, or the file did not
+    # exist to begin with, so no overwriting confirmation needed
     if not need_confirmation:
+        # Send READY message to client, so the client knows to send the file
         clientSocket.send(ready_message.encode())
 
+        # Receive the file in chunks of 1024 bytes (default is 1)
         number_of_chunks = int(int(received_message[2]) / 1024) + 1
+
+        # Open file in write mode
         write_file = open(received_message[1], "wb")
         for n in range(0, number_of_chunks):
+            # Receive a chunk of 1024 bytes and write it to the file
             data = clientSocket.recv(1024)
             write_file.write(data)
 
+    # when we reach this point, we have received the whole file
+    # send acknowledgement message to client
     full_rcv_msg = "FULLY RECEIVED FILE"
     clientSocket.send(full_rcv_msg.encode())
 
+    # Release lock so other threads (clients) can use this function
     lock.release()
+
 
 def receive_client_messages(clientSocket, clientAddr):
     # Wait infinitely for data from the client
@@ -151,6 +173,7 @@ def main():
         newClient = threading.Thread(target=on_new_client, name="FTP Client {}".format(threading.active_count() - 1), args=(client, clientAddr))
         newClient.daemon = True
         newClient.start()
+
 
 if __name__ == "__main__":
     main()
