@@ -1,4 +1,5 @@
 import socket
+from os.path import exists, getsize
 
 
 sock = socket.socket()
@@ -37,6 +38,42 @@ def connect_to_server(command_split):
     return True
 
 
+def put_to_server(command_split):
+    global sock
+
+    if exists(command_split[1]):
+        put_msg = "put " + command_split[1] + " " + str(getsize(command_split[1]))
+
+        sock.send(put_msg.encode())
+
+        not_ready = True
+
+        while not_ready:
+            response = sock.recv(1024).decode()
+            response_split = response.split(" ")
+            if response_split[0] == "CONFIRM:":
+                print(response)
+                client_confirm = input()
+                sock.send(client_confirm.encode())
+                if client_confirm[0] == "N":
+                    return
+            elif response_split[0] == "READY":
+                not_ready = False
+
+        print("Sending %s to the server..." % command_split[1])
+        file_to_send = open(command_split[1], "rb")
+        data = file_to_send.read(1024)
+        while data:
+            sock.send(data)
+            data = file_to_send.read(1024)
+        print("Finished sending file!")
+        server_ack = sock.recv(1024).decode().split(" ")
+        if server_ack[0] == "FULLY":
+            print("Server acknowledged that the file was received in full!")
+    else:
+        print("ERROR: %s - this file does not exist in this directory" % command_split[1])
+
+
 def print_usage():
     print("tigerc.py commands:\n")
     print("\tconnect <TigerS IP Addr> <User> <Password>: attempts to connect to the server with the username and password\n")
@@ -56,13 +93,18 @@ def handle_commands():
                 isConnected = connect_to_server(command_split)
             else:
                 print("You are already connected to a server. Disconnect by entering \"exit\"\n")
-        elif command_split[0] == "get":
-            print("get received")
-        elif command_split[0] == "put":
-            '''print("put received")
-            file_to_send = open("test.txt", "rb")
-            sock.sendfile(file_to_send)
-            print("File sent!")'''
+        elif command_split[0] == "get" and len(command_split) == 2:
+            if not isConnected:
+                print("You need to connect to a server before you can get a file!")
+                print_usage()
+            else:
+                print("get received")
+        elif command_split[0] == "put" and len(command_split) == 2:
+            if not isConnected:
+                print("You need to connect to a server before you can send a file!")
+                print_usage()
+            else:
+                put_to_server(command_split)
         elif command_split[0] == "exit":
             if not isConnected:
                 print("Exit received, no current connection. Exiting application...\n")

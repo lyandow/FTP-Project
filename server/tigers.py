@@ -1,7 +1,12 @@
 import socket
 import threading
+from threading import Lock
 import struct
 import array
+from os.path import exists
+
+
+lock = Lock()
 
 
 def on_new_client(clientSocket, clientAddr):
@@ -57,6 +62,53 @@ def on_new_client(clientSocket, clientAddr):
     print("Client %s has disconnected..." % str(clientAddr))
     return
 
+'''
+    Since we don't want two separate clients writing the same
+    file at the same time, we need this function synchronized
+'''
+def handle_put(clientSocket, received_message):
+    global lock
+    
+    lock.acquire(1)
+        
+    ready_message = "READY FOR FILE"
+
+    # format: put <filename> <filesize>
+
+    need_confirmation = False
+
+    # Check if file already exists
+    if exists(received_message[1]):
+        need_confirmation = True
+
+        while need_confirmation:
+            confirmation_msg = "CONFIRM: File already exists on the server. Do you want to overwrite the file? Y/N:"
+            clientSocket.send(confirmation_msg.encode())
+
+            # wait for response
+            data = clientSocket.recv(1024).decode()
+            
+            if data[0] == "Y":
+                need_confirmation = False
+            elif data[0] == "N":
+                # Client said no, so we don't need to wait for a file
+                # Release lock for other clients and return
+                lock.release()
+                return
+
+    if not need_confirmation:
+        clientSocket.send(ready_message.encode())
+
+        number_of_chunks = int(int(received_message[2]) / 1024) + 1
+        write_file = open(received_message[1], "wb")
+        for n in range(0, number_of_chunks):
+            data = clientSocket.recv(1024)
+            write_file.write(data)
+
+    full_rcv_msg = "FULLY RECEIVED FILE"
+    clientSocket.send(full_rcv_msg.encode())
+
+    lock.release()
 
 def receive_client_messages(clientSocket, clientAddr):
     # Wait infinitely for data from the client
@@ -68,6 +120,11 @@ def receive_client_messages(clientSocket, clientAddr):
         if received_message[0] == "exit":
             # Client sent us "exit", so we return to end the thread
             return
+        elif received_message[0] == "put":
+            # Client sent us "put"
+            handle_put(clientSocket, received_message)
+            
+
 
 
 
