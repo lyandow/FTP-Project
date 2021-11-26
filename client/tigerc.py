@@ -6,23 +6,34 @@ sock = socket.socket()
 
 def connect_to_server(command_split):
     global sock
-    if len(command_split) == 4:
-        try:
-            sock = socket.socket(
-                socket.AF_INET,
-                socket.SOCK_STREAM,
-                socket.IPPROTO_TCP)
-        except socket.error as err:
-            print("There was an error creating a socket: " + err.strerror)
-            return False
-        host = command_split[1]
-        port = 7777
-        print("Attempting to connect to host IP: %s" % host)
-        try:
-            sock.connect((host,port))
-        except socket.error as err:
-            print("Caugh connection error: %s" % err.strerror)
-            return False
+    
+    try:
+        sock = socket.socket(
+            socket.AF_INET,
+            socket.SOCK_STREAM,
+            socket.IPPROTO_TCP)
+    except socket.error as err:
+        print("There was an error creating a socket: " + err.strerror)
+        return False
+    host = command_split[1]
+    port = 7777
+    print("Attempting to connect to host IP: %s User: %s Pass: %s" % (host, command_split[2], command_split[3]))
+    try:
+        sock.connect((host,port))
+    except socket.error as err:
+        print("Caught connection error: %s" % err.strerror)
+        return False
+
+    login_msg = command_split[2] + " " + command_split[3]
+    sock.send(login_msg.encode())
+
+    response = sock.recv(1024).decode()
+    if response.__contains__("ERROR"):
+        print(response)
+        sock.close()
+        return False
+    else:
+        print(response)
     return True
 
 
@@ -39,10 +50,10 @@ def handle_commands():
     while True:
         command = input("Enter a command: ")
         command_split = command.split(" ")
-        if command_split[0] == "connect":
+        if command_split[0] == "connect" and len(command_split) == 4:
             if not isConnected:
-                if connect_to_server(command_split):
-                    isConnected = True
+                # Attempt to connect to the server with the given login info
+                isConnected = connect_to_server(command_split)
             else:
                 print("You are already connected to a server. Disconnect by entering \"exit\"\n")
         elif command_split[0] == "get":
@@ -58,8 +69,13 @@ def handle_commands():
                 return()
             else:
                 print("Disconnecting from the server...\n")
+                exit_msg = "exit"
+                sock.send(exit_msg.encode())
                 sock.close()
                 isConnected = False
+        else:
+            print("Invalid command entered!\n")
+            print_usage()
 
 
 def main():
