@@ -146,7 +146,7 @@ def print_usage():
     print("tigerc.py commands:\n")
     print("\tconnect <TigerS IP Addr> <User> <Password>: attempts to connect to the server with the username and password\n")
     print("\tget <File name>: downloads a file from the server\n")
-    print("\tput <File name>: sends a file to the server\n")
+    print("\tput <File name>: sends a file to the server. File names cannot include spaces.\n")
     print("\texit: closes the server connection OR ends application if no connection is established\n\n")
 
 
