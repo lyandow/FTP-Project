@@ -3,11 +3,11 @@ import threading
 from threading import Lock
 import struct
 import array
-from os.path import exists
+from os.path import exists, getsize
 
-
-lock = Lock()
-
+# Threading Locks
+put_lock = Lock()
+get_lock = Lock()
 
 '''
     This function is the first function called in each client's thread.
@@ -76,10 +76,10 @@ def on_new_client(clientSocket, clientAddr):
     Since we don't want two separate clients writing the same
     file at the same time, we need this function synchronized
 '''
-def handle_put(clientSocket, received_message):
-    global lock
+def handle_put(clientSocket, received_message, clientAddr):
+    global put_lock
     # Get lock for this function
-    lock.acquire(1)
+    put_lock.acquire(1)
         
     ready_message = "READY FOR FILE"
 
@@ -104,7 +104,7 @@ def handle_put(clientSocket, received_message):
             elif data[0] == "N":
                 # Client said no, so we don't need to wait for a file
                 # Release lock for other clients and return
-                lock.release()
+                put_lock.release()
                 return
 
     # Client has either confirmed overwriting file, or the file did not
@@ -122,14 +122,57 @@ def handle_put(clientSocket, received_message):
             # Receive a chunk of 1024 bytes and write it to the file
             data = clientSocket.recv(1024)
             write_file.write(data)
+        write_file.close()
 
     # when we reach this point, we have received the whole file
     # send acknowledgement message to client
     full_rcv_msg = "FULLY RECEIVED FILE"
     clientSocket.send(full_rcv_msg.encode())
 
+    print("Client %s has uploaded %s" % (clientAddr, received_message[1]))
+
     # Release lock so other threads (clients) can use this function
-    lock.release()
+    put_lock.release()
+
+
+def handle_get(clientSocket, received_message, clientAddr):
+    global get_lock
+    # Get lock for this function
+    get_lock.acquire(1)
+
+
+    if exists(received_message[1]):
+        size_str = str(getsize(received_message[1]))
+
+        # Send the size of the file to the client so they now what to expect
+        clientSocket.send(size_str.encode())
+
+        # Wait to get READY message from client
+        ready = clientSocket.recv(1024).decode()
+
+        if ready == "READY":
+            # Open the file so we can send it to the server
+            file_to_send = open(received_message[1], "rb")
+
+            # Read first 1024 bytes
+            data = file_to_send.read(1024)
+            while data:
+                # Send data to the server
+                clientSocket.send(data)
+
+                # Try to read more data from the file. Loop exits when data is empty
+                data = file_to_send.read(1024)
+            
+            print("Sent %s to client: %s" % (received_message[1], clientAddr))
+
+
+    else:
+        error_message = "ERROR: The requested file does not exist on the server."
+        clientSocket.send(error_message.encode())
+
+
+    # Release the lock for this function
+    get_lock.release()
 
 
 def receive_client_messages(clientSocket, clientAddr):
@@ -143,8 +186,11 @@ def receive_client_messages(clientSocket, clientAddr):
             # Client sent us "exit", so we return to end the thread
             return
         elif received_message[0] == "put":
-            # Client sent us "put"
-            handle_put(clientSocket, received_message)
+            # Client sent us "put", so we attempt to receive a file from them
+            handle_put(clientSocket, received_message, clientAddr)
+        elif received_message[0] == "get":
+            # Client sent us "get", so we send them a file
+            handle_get(clientSocket, received_message, clientAddr)
             
 
 

@@ -98,6 +98,50 @@ def put_to_server(command_split):
         print("ERROR: %s - this file does not exist in this directory" % command_split[1])
 
 
+def get_from_server(command_split):
+    global sock
+
+
+    ready = True
+    if exists(command_split[1]):
+        confirm = input("File already exists in this directory. Do you want to overwrite it with the server's copy? Y/N:")
+        if confirm[0] == "N":
+            ready = False
+        elif confirm[0] == "Y":
+            ready = True
+
+    if ready:
+
+        # Send get command to the server
+        get_str = "get " + command_split[1]
+        sock.send(get_str.encode())
+
+        # Get size of file from the server
+        response = sock.recv(1024).decode()
+        response_split = response.split(" ")
+
+        # If response is not ERROR, then it is the size
+        if response_split[0] == "ERROR:":
+            print(response)
+            return
+
+        # Receive the file in chunks of 1024 bytes (default is 1)
+        number_of_chunks = int(int(response_split[0]) / 1024) + 1
+
+        ready_str = "READY"
+        sock.send(ready_str.encode())
+
+        # Open file in write mode
+        write_file = open(command_split[1], "wb")
+        for n in range(0, number_of_chunks):
+            # Receive a chunk of 1024 bytes and write it to the file
+            data = sock.recv(1024)
+            write_file.write(data)
+        write_file.close()
+
+        print("Successfully received file from the server")
+
+
 def print_usage():
     print("tigerc.py commands:\n")
     print("\tconnect <TigerS IP Addr> <User> <Password>: attempts to connect to the server with the username and password\n")
@@ -126,7 +170,7 @@ def handle_commands():
                 print_usage()
             else:
                 # Attempt to download a file from the server
-                print("get received")
+                get_from_server(command_split)
         elif command_split[0] == "put" and len(command_split) == 2:
             if not isConnected:
                 print("You need to connect to a server before you can send a file!")
