@@ -81,7 +81,7 @@ def handle_put(clientSocket, received_message, clientAddr):
     # Get lock for this function
     put_lock.acquire(1)
         
-    ready_message = "READY FOR FILE"
+    ready_message = "READY"
 
     # message format: put <filename> <filesize>
 
@@ -185,10 +185,10 @@ def receive_client_messages(clientSocket, clientAddr):
         if received_message[0] == "exit":
             # Client sent us "exit", so we return to end the thread
             return
-        elif received_message[0] == "put":
+        elif received_message[0] == "PUT:":
             # Client sent us "put", so we attempt to receive a file from them
             handle_put(clientSocket, received_message, clientAddr)
-        elif received_message[0] == "get":
+        elif received_message[0] == "GET:":
             # Client sent us "get", so we send them a file
             handle_get(clientSocket, received_message, clientAddr)
             
@@ -203,7 +203,7 @@ def main():
     hostname = socket.gethostname()
     ip = socket.gethostbyname(hostname)
     port = 7777
-    string = "listening on " + hostname + "\nIP: " + ip + "\n"
+    string = "Listening on " + hostname + "\nIP: " + ip + "\n"
     print(string)
 
     # Bind socket, listen

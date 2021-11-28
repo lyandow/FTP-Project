@@ -48,7 +48,7 @@ def put_to_server(command_split):
 
     # Check if file exists - we can't send a file that doesn't exist
     if exists(command_split[1]):
-        put_msg = "put " + command_split[1] + " " + str(getsize(command_split[1]))
+        put_msg = "PUT: " + command_split[1] + " " + str(getsize(command_split[1]))
 
         # Send put command and info to the server
         sock.send(put_msg.encode())
@@ -104,7 +104,7 @@ def get_from_server(command_split):
 
     ready = True
     if exists(command_split[1]):
-        confirm = input("File already exists in this directory. Do you want to overwrite it with the server's copy? Y/N:")
+        confirm = input("CONFIRM: File already exists in this directory. Do you want to overwrite it with the server's copy? Y/N:")
         if confirm[0] == "N":
             ready = False
         elif confirm[0] == "Y":
@@ -113,7 +113,7 @@ def get_from_server(command_split):
     if ready:
 
         # Send get command to the server
-        get_str = "get " + command_split[1]
+        get_str = "GET: " + command_split[1]
         sock.send(get_str.encode())
 
         # Get size of file from the server
