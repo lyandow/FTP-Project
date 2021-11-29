@@ -1,13 +1,10 @@
 import socket
 import threading
 from threading import Lock
-import struct
-import array
 from os.path import exists, getsize
 
 # Threading Locks
-put_lock = Lock()
-get_lock = Lock()
+lock = Lock()
 
 '''
     This function is the first function called in each client's thread.
@@ -77,9 +74,9 @@ def on_new_client(clientSocket, clientAddr):
     file at the same time, we need this function synchronized
 '''
 def handle_put(clientSocket, received_message, clientAddr):
-    global put_lock
+    global lock
     # Get lock for this function
-    put_lock.acquire(1)
+    lock.acquire(1)
         
     ready_message = "READY"
 
@@ -104,7 +101,7 @@ def handle_put(clientSocket, received_message, clientAddr):
             elif data[0] == "N":
                 # Client said no, so we don't need to wait for a file
                 # Release lock for other clients and return
-                put_lock.release()
+                lock.release()
                 return
 
     # Client has either confirmed overwriting file, or the file did not
@@ -132,13 +129,13 @@ def handle_put(clientSocket, received_message, clientAddr):
     print("Client %s has uploaded %s" % (clientAddr, received_message[1]))
 
     # Release lock so other threads (clients) can use this function
-    put_lock.release()
+    lock.release()
 
 
 def handle_get(clientSocket, received_message, clientAddr):
-    global get_lock
+    global lock
     # Get lock for this function
-    get_lock.acquire(1)
+    lock.acquire(1)
 
 
     if exists(received_message[1]):
@@ -172,7 +169,7 @@ def handle_get(clientSocket, received_message, clientAddr):
 
 
     # Release the lock for this function
-    get_lock.release()
+    lock.release()
 
 
 def receive_client_messages(clientSocket, clientAddr):
